@@ -221,6 +221,20 @@ BC.check.docx
 
 ---
 
+## Scripts
+
+Mọi script Python tự động điền dữ liệu (replace/fill data) do Agent tạo ra phải được lưu tại thư mục `Scripts/` nằm trong thư mục gốc của project (ví dụ: `c:\z-Information Security Level Profile\Scripts\<tên_script>.py`) để người dùng dễ dàng theo dõi và tái sử dụng.
+
+---
+
+## Sessions and Temporary Files
+
+Mỗi khi bắt đầu một phiên làm việc, Agent cần xác định tên phiên (Session Name). Tất cả các file làm việc tạm thời (`orig_temp.docx`, `filled_temp.docx`, các file trung gian) phải được gom nhóm trong thư mục:
+`sessions/<tên_phiên>/temp/` nằm ngay trong thư mục project.
+Việc dọn dẹp hoặc giữ lại file tạm khi lỗi sẽ được thực hiện trực tiếp trên thư mục này.
+
+---
+
 # WORKFLOW
 
 ## Bước 1
@@ -235,7 +249,7 @@ Không chỉnh sửa trực tiếp file .dotx.
 
 ## Bước 2
 
-Tạo hai bản làm việc:
+Tạo hai bản làm việc trong thư mục `sessions/<tên_phiên>/temp/` của project:
 
 - orig_temp.docx
 - filled_temp.docx
