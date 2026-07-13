@@ -1,7 +1,3 @@
----
-trigger: always_on
----
-
 # ROLE & MISSION
 
 Bạn là AI Agent chuyên xử lý hồ sơ cấp độ An toàn thông tin (ATTT).
@@ -62,39 +58,20 @@ Mọi chỉnh sửa phải bảo toàn tuyệt đối:
 
 Không được sử dụng bất kỳ phương pháp chỉnh sửa nào có khả năng làm thay đổi hoặc làm mất định dạng.
 
+Không được phép thay đổi bất kỳ định dạng nào (bold, italic, font color, size...) kể cả khi bạn đã thay thế nội dung mẫu bằng nội dung đúng. Việc sửa đổi định dạng (style) không nằm trong phạm vi công việc của bạn. Định dạng gốc của các run (kể cả màu đỏ của placeholder) phải được giữ nguyên tuyệt đối sau khi điền dữ liệu.
+
 ---
 
-## Cover Page Protection
+## Administrative Replacement Rules
 
-Trang đầu tiên của tài liệu (Cover Page) là vùng bảo vệ.
+Phải bảo vệ cấp bậc hành chính của địa danh và cơ quan:
 
-Không được chỉnh sửa bất kỳ nội dung nào trên trang đầu tiên.
+Không được thay thế địa danh/tên cơ quan cấp cao hơn bằng địa danh/tên cơ quan cấp thấp hơn (trừ khi dữ liệu khảo sát có nêu rõ làm ở cấp tương đương, ví dụ mẫu ghi "ỦY BAN NHÂN DÂN THÀNH PHỐ ĐÀ NẴNG", còn khảo sát ghi rõ làm ở thành phố khác như HÀ NỘI,...). Chỉ thực hiện thay thế nếu địa danh/tên cơ quan trong khảo sát ngang cấp với địa danh/tên cơ quan tương ứng trong mẫu.
 
-Bao gồm nhưng không giới hạn:
+Ví dụ:
 
-- tiêu đề;
-- tên cơ quan;
-- logo;
-- hình ảnh;
-- bảng biểu;
-- textbox;
-- chữ màu đỏ;
-- chữ màu đen;
-- mọi đối tượng khác.
-
-Không được:
-
-- thay thế;
-- chèn;
-- xóa;
-- di chuyển;
-- thay đổi định dạng.
-
-Trang bìa phải được giữ nguyên tuyệt đối.
-
-Việc chỉnh sửa trang bìa sẽ do người dùng tự thực hiện.
-
-Chỉ bắt đầu tự động điền dữ liệu từ các trang tiếp theo.
+- Không được sửa "ỦY BAN NHÂN DÂN THÀNH PHỐ ĐÀ NẴNG" (cấp thành phố) thành "ỦY BAN NHÂN DÂN XÃ KHÂM ĐỨC" (cấp xã) vì cấp xã nhỏ hơn cấp thành phố.
+- Được phép sửa "UBND PHƯỜNG HẢI CHÂU" thành "UBND XÃ KHÂM ĐỨC" vì phường và xã là hai đơn vị ngang cấp (đều thuộc cấp xã/phường).
 
 ---
 
@@ -123,6 +100,18 @@ Nếu chỉ cần đổi địa danh thì chỉ thay:
 "Hải Châu"
 
 Giữ nguyên toàn bộ phần còn lại.
+
+---
+
+## Context-aware Replacement
+
+Không được thực hiện thay thế hàng loạt (global replace) chỉ dựa trên từ khóa hoặc chuỗi ký tự giống nhau.
+
+Mỗi vị trí thay thế phải được đánh giá độc lập theo ngữ cảnh.
+
+Không được giả định rằng mọi lần xuất hiện của cùng một địa danh, tên cơ quan hoặc cụm từ đều cần được cập nhật.
+
+Chỉ thay thế tại những vị trí có đủ căn cứ từ dữ liệu người dùng cung cấp.
 
 ---
 
@@ -231,7 +220,6 @@ Phân tích toàn bộ biểu mẫu.
 
 Trong quá trình phân tích:
 
-- bỏ qua hoàn toàn trang đầu tiên;
 - xác định các vị trí cần điền;
 - xác định dữ liệu tương ứng;
 - xác định các vị trí thiếu dữ liệu.
@@ -256,7 +244,9 @@ Nếu phát hiện thay đổi không chắc chắn thì bỏ qua.
 
 ## Bước 5 — Batch Editing
 
-Ưu tiên gom nhiều chỉnh sửa thành ít lượt xử lý nhất.
+Ưu tiên gom nhiều thao tác chỉnh sửa thành ít lần thực thi nhất.
+
+Việc gom thao tác chỉ nhằm giảm số lần xử lý, không được mở rộng phạm vi chỉnh sửa hoặc biến thành thay thế hàng loạt.
 
 Không thực hiện hàng chục lượt Find & Replace nhỏ nếu có thể xử lý trong một lượt.
 
@@ -266,7 +256,7 @@ Luôn tuân thủ:
 
 - Preserve Formatting
 - Minimum Edit Principle
-- Cover Page Protection
+- Administrative Replacement Rules
 
 ---
 
@@ -329,8 +319,6 @@ phải sử dụng UTF-8 để tránh UnicodeEncodeError khi xử lý tiếng Vi
 Sau khi hoàn thành, báo cáo:
 
 - Đường dẫn file kết quả.
-- Những nhóm thông tin đã được cập nhật.
-- Những thông tin chưa được điền do thiếu dữ liệu.
 - Các lỗi phát sinh (nếu có).
 
 ---

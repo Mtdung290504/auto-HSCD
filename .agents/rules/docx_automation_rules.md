@@ -62,13 +62,15 @@ Mọi chỉnh sửa phải bảo toàn tuyệt đối:
 
 Không được sử dụng bất kỳ phương pháp chỉnh sửa nào có khả năng làm thay đổi hoặc làm mất định dạng.
 
+Không được phép thay đổi bất kỳ định dạng nào (bold, italic, font color, size...) kể cả khi bạn đã thay thế nội dung mẫu bằng nội dung đúng. Việc sửa đổi định dạng (style) không nằm trong phạm vi công việc của bạn. Định dạng gốc của các run (kể cả màu đỏ của placeholder) phải được giữ nguyên tuyệt đối sau khi điền dữ liệu.
+
 ---
 
-## Cover Page Protection
+## Administrative Replacement Rules
 
-Được phép chỉnh sửa trang đầu tiên của tài liệu (Cover Page) để điền thông tin, nhưng phải bảo vệ cấp bậc hành chính của địa danh và cơ quan:
+Phải bảo vệ cấp bậc hành chính của địa danh và cơ quan:
 
-Không được thay thế địa danh/tên cơ quan cấp cao hơn bằng địa danh/tên cơ quan cấp thấp hơn (trừ khi dữ liệu khảo sát có nêu rõ làm ở cấp tương đương). Chỉ thực hiện thay thế nếu địa danh/tên cơ quan trong khảo sát ngang cấp với địa danh/tên cơ quan tương ứng trong mẫu.
+Không được thay thế địa danh/tên cơ quan cấp cao hơn bằng địa danh/tên cơ quan cấp thấp hơn (trừ khi dữ liệu khảo sát có nêu rõ làm ở cấp tương đương, ví dụ mẫu ghi "ỦY BAN NHÂN DÂN THÀNH PHỐ ĐÀ NẴNG", còn khảo sát ghi rõ làm ở thành phố khác như HÀ NỘI,...). Chỉ thực hiện thay thế nếu địa danh/tên cơ quan trong khảo sát ngang cấp với địa danh/tên cơ quan tương ứng trong mẫu.
 
 Ví dụ:
 - Không được sửa "ỦY BAN NHÂN DÂN THÀNH PHỐ ĐÀ NẴNG" (cấp thành phố) thành "ỦY BAN NHÂN DÂN XÃ KHÂM ĐỨC" (cấp xã) vì cấp xã nhỏ hơn cấp thành phố.
@@ -104,6 +106,18 @@ Giữ nguyên toàn bộ phần còn lại.
 
 ---
 
+## Context-aware Replacement
+
+Không được thực hiện thay thế hàng loạt (global replace) chỉ dựa trên từ khóa hoặc chuỗi ký tự giống nhau.
+
+Mỗi vị trí thay thế phải được đánh giá độc lập theo ngữ cảnh.
+
+Không được giả định rằng mọi lần xuất hiện của cùng một địa danh, tên cơ quan hoặc cụm từ đều cần được cập nhật.
+
+Chỉ thay thế tại những vị trí có đủ căn cứ từ dữ liệu người dùng cung cấp.
+
+---
+
 # DATA FILLING RULES
 
 Chỉ sử dụng dữ liệu do người dùng cung cấp.
@@ -133,6 +147,35 @@ và người dùng không chỉ định năm,
 được phép cập nhật thành năm hiện tại của hệ thống.
 
 Không áp dụng quy tắc này nếu người dùng đã cung cấp năm cụ thể.
+
+QUAN TRỌNG: Chỉ áp dụng cho các trường ngày, tháng, năm dùng để ký, ban hành hoặc lập hồ sơ.
+
+Không áp dụng cho:
+
+- số hiệu văn bản;
+- mã tài liệu;
+- số quyết định;
+- số nghị định;
+- số thông tư;
+- số tiêu chuẩn;
+- số hiệu biểu mẫu;
+- phiên bản;
+- bất kỳ mã định danh nào có chứa năm.
+
+Ví dụ:
+
+Được phép:
+
+Ngày ... tháng ... năm 2025
+→ năm 2026
+
+Không được phép:
+
+Nghị định 85/2016/NĐ-CP
+
+Thông tư 12/2022/TT-BTTTT
+
+Quyết định 38/2020/QĐ-TTg
 
 ---
 
@@ -209,7 +252,6 @@ Phân tích toàn bộ biểu mẫu.
 
 Trong quá trình phân tích:
 
-- bỏ qua hoàn toàn trang đầu tiên;
 - xác định các vị trí cần điền;
 - xác định dữ liệu tương ứng;
 - xác định các vị trí thiếu dữ liệu.
@@ -234,17 +276,19 @@ Nếu phát hiện thay đổi không chắc chắn thì bỏ qua.
 
 ## Bước 5 — Batch Editing
 
-Ưu tiên gom nhiều chỉnh sửa thành ít lượt xử lý nhất.
+Ưu tiên thu thập toàn bộ thay đổi trước, sau đó thực hiện chỉnh sửa trong một lần xử lý hoặc số lần xử lý ít nhất có thể.
+
+Không vừa tìm kiếm vừa chỉnh sửa từng vị trí.
+
+Việc gom thao tác chỉ nhằm giảm số lần xử lý, không được mở rộng phạm vi chỉnh sửa hoặc biến thành thay thế hàng loạt.
 
 Không thực hiện hàng chục lượt Find & Replace nhỏ nếu có thể xử lý trong một lượt.
-
-Việc gom chỉnh sửa không được làm tăng phạm vi thay đổi.
 
 Luôn tuân thủ:
 
 - Preserve Formatting
 - Minimum Edit Principle
-- Cover Page Protection
+- Administrative Replacement Rules
 
 ---
 
@@ -285,12 +329,17 @@ Kết quả cuối cùng:
 
 ## Bước 8
 
-Xóa toàn bộ file tạm được tạo trong phiên:
+Nếu quy trình hoàn thành thành công:
 
-- orig_temp.docx
-- filled_temp.docx
+- xóa các file tạm đã tạo trong quá trình xử lý
 
-Không xóa các file khác.
+Nếu quy trình thất bại:
+
+- giữ nguyên toàn bộ file tạm;
+- báo rõ nguyên nhân lỗi;
+- hỏi người dùng có muốn dọn dẹp các file tạm hay giữ lại để phục vụ việc debug.
+
+Không tự ý xóa hiện vật khi quy trình thất bại.
 
 ---
 
@@ -307,8 +356,6 @@ phải sử dụng UTF-8 để tránh UnicodeEncodeError khi xử lý tiếng Vi
 Sau khi hoàn thành, báo cáo:
 
 - Đường dẫn file kết quả.
-- Những nhóm thông tin đã được cập nhật.
-- Những thông tin chưa được điền do thiếu dữ liệu.
 - Các lỗi phát sinh (nếu có).
 
 ---
