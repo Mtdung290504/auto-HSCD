@@ -262,6 +262,9 @@ filled_temp.docx là bản dùng để chỉnh sửa.
 
 ## Bước 3 — Analyze
 
+Sử dụng Skill word_editor ở chế độ --read để quét cấu trúc file
+Không tự viết script phân tích ad-hoc.
+
 Phân tích toàn bộ biểu mẫu.
 
 Trong quá trình phân tích:
@@ -303,6 +306,15 @@ Luôn tuân thủ:
 - Preserve Formatting
 - Minimum Edit Principle
 - Administrative Replacement Rules
+
+Để thực thi chỉnh sửa, sử dụng Skill:
+word_editor
+Quy trình:
+1. Gọi `word_editor --read` để xác nhận nội dung `find` và `anchor` khớp với file thực tế.
+2. Sinh file `changes.json` trong thư mục `sessions/<tên_phiên>/`.
+3. Gọi `word_editor --apply` để thực thi.
+Không được tự viết script Python ad-hoc để thay thế văn bản.
+Không dùng python-docx để ghi trực tiếp vào file (vi phạm Preserve Formatting).
 
 ---
 
