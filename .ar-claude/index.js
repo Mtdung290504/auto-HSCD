@@ -1,9 +1,5 @@
 import { spawn } from "node:child_process";
-
-const CONFIG = {
-    baseUrl: "https://agentrouter.org",
-    model: "claude-opus-4-8",
-};
+import CONFIG from './config.json' with { type: 'json' }
 
 function readSecret(prompt) {
     return new Promise((resolve, reject) => {
