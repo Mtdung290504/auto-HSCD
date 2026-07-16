@@ -6,7 +6,7 @@ Nếu chưa cài claude-code, chạy:
 npm install -g @anthropic-ai/claude-code
 ```
 
-tại thư mục, điền:
+tại thư mục `C:\Users\<username>\.claude\settings.json`, điền:
 
 ```json
 {
@@ -18,7 +18,7 @@ tại thư mục, điền:
 }
 ```
 
-Chạy:
+Vào thư mục workplace cần làm việc, mở terminal chạy:
 
 ```bash
 claude.cmd # Trong trường hợp new chat
