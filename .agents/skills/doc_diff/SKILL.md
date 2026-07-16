@@ -32,7 +32,7 @@ The script requires:
 Run the comparison script:
 
 ```bash
-python "c:/z-Information Security Level Profile/.agents/skills/doc_diff/doc-diff.py" "<original_docx>" "<edited_docx>" "<output_check_docx>"
+python "c:/z-Information Security Level Profile/.agents/skills/doc_diff/scripts/doc-diff.py" "<original_docx>" "<edited_docx>" "<output_check_docx>"
 ```
 
 ## Output
