@@ -9,19 +9,52 @@ description: "Use this skill whenever the user asks to read, open, analyze, summ
 
 ## Cách dùng
 
-Chạy script, truyền vào đường dẫn tới file Excel. Đường dẫn script bên dưới là đường dẫn tương đối so với thư mục chứa skill này (dù skill được cài ở đâu) — hãy resolve theo vị trí đó, đừng hard-code đường dẫn tuyệt đối.
+Chạy script, truyền vào đường dẫn tới file Excel. Đường dẫn script bên dưới là đường dẫn tương đối so với thư mục chứa skill này.
+
+1. **Chuyển đổi sang JSON (xuất ra file) - Mặc định**:
 
 ```bash
-python ".agents/skills/excel_reader/scripts/excel_parser.py" "<đường_dẫn_file_excel>"
+python ".agents/skills/excel_reader/scripts/excel_parser.py" "<đường_dẫn_file_excel>" "<đường_dẫn_file_ra.json>" [--all]
 ```
 
-Mặc định, các sheet ẩn sẽ bị bỏ qua. Để hiển thị luôn cả sheet ẩn:
+2. **Chuyển đổi sang Markdown (in ra stdout)**:
 
 ```bash
-python ".agents/skills/excel_reader/scripts/excel_parser.py" "<đường_dẫn_file_excel>" --all
+python ".agents/skills/excel_reader/scripts/excel_parser.py" "<đường_dẫn_file_excel>" --md [--all]
 ```
 
 ## Định dạng output
+
+### 1. Định dạng JSON (Mặc định)
+
+Lưu dữ liệu ra tệp JSON dưới dạng grid mảng hai chiều:
+
+```json
+{
+  "sheets": {
+    "Tên Sheet": {
+      "hidden": false,
+      "grid": [
+        ["Giá trị ô chủ", [row_idx, col_idx]],
+        ["Giá trị ô khác", ""]
+      ]
+    }
+  }
+}
+```
+
+- **Tối ưu hóa ô gộp (Merged Cells)**: Để tránh trùng lặp dữ liệu chuỗi dài, chỉ có ô góc trên bên trái (ô chủ) lưu chuỗi giá trị thực. Tất cả các ô phụ còn lại trong vùng merge sẽ lưu một mảng tọa độ 0-based `[row, col]` chỉ đến ô chủ.
+- Khi phân tích bằng Python, bất kỳ ô nào thuộc kiểu `list`/`array` trong grid đều là ô tham chiếu trỏ đến ô chủ. Cấu trúc tham chiếu này có thể được đọc dễ dàng:
+  ```python
+  cell = grid[r][c]
+  if isinstance(cell, list):
+      ref_row, ref_col = cell
+      val = grid[ref_row][ref_col]
+  ```
+- `*Sheet is empty.*` / `*Sheet has only empty cells.*` nghĩa là sheet đó không có dữ liệu sử dụng được.
+- Các dòng/cột trống ở cuối bảng được tự động cắt bỏ.
+
+### 2. Định dạng Markdown (khi dùng `--md`)
 
 Stdout là Markdown, có cấu trúc như sau:
 
@@ -32,19 +65,10 @@ Stdout là Markdown, có cấu trúc như sau:
 | Header1 | Header2 | ... |
 | --- | --- | --- |
 | val | val | ... |
-
-## Sheet: <sheet khác> (Hidden)
-...
 ```
 
-Một số lưu ý khi đọc output:
-
-- `(Hidden)` sau tên sheet nghĩa là tab đó bị ẩn trong file gốc (chỉ xuất hiện khi chạy với `--all`).
-- Header cột hiển thị dạng `Col 3` nghĩa là ô tiêu đề đó trống trong file gốc — cột vẫn có dữ liệu nhưng không có tên.
-- Các ô bị merge (gộp ô) đã được "trải" ra, mỗi ô bên dưới vùng merge đều hiện đúng giá trị đã gộp, thay vì hiện trống.
+- Các ô bị merge (gộp ô) được tự động giải quyết trực tiếp để hiển thị đầy đủ chuỗi ký tự của ô chủ (ô góc trên bên trái).
 - Ngày tháng được định dạng `YYYY-MM-DD` (hoặc `YYYY-MM-DD HH:MM:SS` nếu có kèm giờ).
-- `*Sheet is empty.*` / `*Sheet has only empty cells.*` nghĩa là sheet đó không có dữ liệu sử dụng được.
-- Các dòng/cột trống ở cuối bảng được tự động cắt bỏ.
 
 ## Lỗi
 

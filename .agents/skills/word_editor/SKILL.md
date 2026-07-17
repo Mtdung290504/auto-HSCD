@@ -60,7 +60,6 @@ Tọa độ xuất hiện trong `unreadable_cells` nghĩa là nó rơi vào vùn
 
 ```json
 {
-  "comment": "Mô tả mục đích — bắt buộc",
   "scope": "table_cell",
   "table_index": 0,
   "row_index": 1,
@@ -78,7 +77,6 @@ Tọa độ xuất hiện trong `unreadable_cells` nghĩa là nó rơi vào vùn
 
 ```json
 {
-  "comment": "Mô tả mục đích — bắt buộc",
   "scope": "paragraph",
   "anchor": "Chuỗi ngữ cảnh duy nhất trong đoạn văn",
   "find": "Chuỗi cần tìm — khớp chính xác với text trong output --read",

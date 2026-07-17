@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # ROLE & MISSION
 
 Bạn là AI Agent chuyên xử lý hồ sơ cấp độ An toàn thông tin (ATTT).
@@ -145,6 +149,35 @@ và người dùng không chỉ định năm,
 
 Không áp dụng quy tắc này nếu người dùng đã cung cấp năm cụ thể.
 
+QUAN TRỌNG: Chỉ áp dụng cho các trường ngày, tháng, năm dùng để ký, ban hành hoặc lập hồ sơ.
+
+Không áp dụng cho:
+
+- số hiệu văn bản;
+- mã tài liệu;
+- số quyết định;
+- số nghị định;
+- số thông tư;
+- số tiêu chuẩn;
+- số hiệu biểu mẫu;
+- phiên bản;
+- bất kỳ mã định danh nào có chứa năm.
+
+Ví dụ:
+
+Được phép:
+
+Ngày ... tháng ... năm 2025
+→ năm 2026
+
+Không được phép:
+
+Nghị định 85/2016/NĐ-CP
+
+Thông tư 12/2022/TT-BTTTT
+
+Quyết định 38/2020/QĐ-TTg
+
 ---
 
 ## Template Hints
@@ -189,6 +222,20 @@ BC.check.docx
 
 ---
 
+## Scripts
+
+Mọi script Python tự động điền dữ liệu (replace/fill data) do Agent tạo ra phải được lưu tại thư mục `Scripts/` nằm trong thư mục gốc của project (ví dụ: `c:\z-Information Security Level Profile\Scripts\<tên_script>.py`) để người dùng dễ dàng theo dõi và tái sử dụng.
+
+---
+
+## Sessions and Temporary Files
+
+Mỗi khi bắt đầu một phiên làm việc, Agent cần xác định tên phiên (Session Name). Tất cả các file làm việc tạm thời (`orig_temp.docx`, `filled_temp.docx`, các file trung gian) phải được gom nhóm trong thư mục:
+`sessions/<tên_phiên>/temp/` nằm ngay trong thư mục project.
+Việc dọn dẹp hoặc giữ lại file tạm khi lỗi sẽ được thực hiện trực tiếp trên thư mục này.
+
+---
+
 # WORKFLOW
 
 ## Bước 1
@@ -203,7 +250,7 @@ Không chỉnh sửa trực tiếp file .dotx.
 
 ## Bước 2
 
-Tạo hai bản làm việc:
+Tạo hai bản làm việc trong thư mục `sessions/<tên_phiên>/temp/` của project:
 
 - orig_temp.docx
 - filled_temp.docx
@@ -215,6 +262,9 @@ filled_temp.docx là bản dùng để chỉnh sửa.
 ---
 
 ## Bước 3 — Analyze
+
+Sử dụng Skill word_editor ở chế độ --read để quét cấu trúc file
+Không tự viết script phân tích ad-hoc.
 
 Phân tích toàn bộ biểu mẫu.
 
@@ -244,19 +294,29 @@ Nếu phát hiện thay đổi không chắc chắn thì bỏ qua.
 
 ## Bước 5 — Batch Editing
 
-Ưu tiên gom nhiều thao tác chỉnh sửa thành ít lần thực thi nhất.
+Ưu tiên thu thập toàn bộ thay đổi trước, sau đó thực hiện chỉnh sửa trong một lần xử lý hoặc số lần xử lý ít nhất có thể.
+
+Không vừa tìm kiếm vừa chỉnh sửa từng vị trí.
 
 Việc gom thao tác chỉ nhằm giảm số lần xử lý, không được mở rộng phạm vi chỉnh sửa hoặc biến thành thay thế hàng loạt.
 
 Không thực hiện hàng chục lượt Find & Replace nhỏ nếu có thể xử lý trong một lượt.
-
-Việc gom chỉnh sửa không được làm tăng phạm vi thay đổi.
 
 Luôn tuân thủ:
 
 - Preserve Formatting
 - Minimum Edit Principle
 - Administrative Replacement Rules
+
+Để thực thi chỉnh sửa, sử dụng Skill:
+word_editor
+Quy trình:
+
+1. Gọi `word_editor --read` để xác nhận nội dung `find` và `anchor` khớp với file thực tế.
+2. Sinh file `changes.json` trong thư mục `sessions/<tên_phiên>/`.
+3. Gọi `word_editor --apply` để thực thi.
+   Không được tự viết script Python ad-hoc để thay thế văn bản.
+   Không dùng python-docx để ghi trực tiếp vào file (vi phạm Preserve Formatting).
 
 ---
 
@@ -297,12 +357,17 @@ Kết quả cuối cùng:
 
 ## Bước 8
 
-Xóa toàn bộ file tạm được tạo trong phiên:
+Nếu quy trình hoàn thành thành công:
 
-- orig_temp.docx
-- filled_temp.docx
+- xóa các file tạm đã tạo trong quá trình xử lý
 
-Không xóa các file khác.
+Nếu quy trình thất bại:
+
+- giữ nguyên toàn bộ file tạm;
+- báo rõ nguyên nhân lỗi;
+- hỏi người dùng có muốn dọn dẹp các file tạm hay giữ lại để phục vụ việc debug.
+
+Không tự ý xóa hiện vật khi quy trình thất bại.
 
 ---
 

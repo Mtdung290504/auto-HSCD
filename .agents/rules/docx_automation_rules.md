@@ -229,9 +229,18 @@ Mọi script Python tự động điền dữ liệu (replace/fill data) do Agen
 
 ## Sessions and Temporary Files
 
-Mỗi khi bắt đầu một phiên làm việc, Agent cần xác định tên phiên (Session Name). Tất cả các file làm việc tạm thời (`orig_temp.docx`, `filled_temp.docx`, các file trung gian) phải được gom nhóm trong thư mục:
-`sessions/<tên_phiên>/temp/` nằm ngay trong thư mục project.
-Việc dọn dẹp hoặc giữ lại file tạm khi lỗi sẽ được thực hiện trực tiếp trên thư mục này.
+Mỗi khi bắt đầu một phiên làm việc, Agent cần xác định tên phiên (Session Name).
+
+Mọi file phát sinh trong quá trình xử lý — bao gồm nhưng không giới hạn:
+- orig_temp.docx, filled_temp.docx
+- JSON xuất từ excel_parser.py
+- JSON xuất từ word_editor.py --read
+- script ánh xạ dùng một lần (theo mục AUTOMATION & DATA MAPPING)
+- changes.json
+
+phải nằm trong `sessions/<tên_phiên>/temp/`.
+
+Việc dọn dẹp hoặc giữ lại file tạm khi lỗi được thực hiện trực tiếp trên thư mục `temp/` này.
 
 ---
 
@@ -366,6 +375,24 @@ Nếu quy trình thất bại:
 - hỏi người dùng có muốn dọn dẹp các file tạm hay giữ lại để phục vụ việc debug.
 
 Không tự ý xóa hiện vật khi quy trình thất bại.
+
+---
+
+# AUTOMATION & DATA MAPPING
+
+Để giảm token và tránh lỗi hard-code chuỗi văn bản thủ công, việc ánh xạ dữ liệu Excel sang Word phải đi qua JSON, không được viết tay từng chuỗi.
+
+Quy trình bắt buộc:
+
+1. Xuất dữ liệu khảo sát ra JSON bằng `excel_parser.py`.
+2. Xuất cấu trúc file Word đích ra JSON bằng `word_editor.py --read`.
+3. Viết một script ánh xạ ngắn gọn (Node.js hoặc Python, dùng thư viện chuẩn) đọc 2 file JSON trên, đối chiếu theo tọa độ [row, col] hoặc paragraph_index, và sinh ra `changes.json` cho `word_editor.py --apply`.
+
+Không được:
+- viết script dài, hard-code chuỗi văn bản đọc từ Excel trực tiếp vào code;
+- tự tạo logic đọc Word/Excel khác ngoài `excel_parser.py` và `word_editor.py --read`.
+
+Script ánh xạ là script dùng một lần cho phiên làm việc hiện tại (mỗi mẫu docx có cấu trúc khác nhau, script không tái sử dụng được giữa các mẫu) — lưu cùng các file JSON trung gian và `changes.json` theo quy tắc ở mục Sessions and Temporary Files, không lưu ở `Scripts/`.
 
 ---
 

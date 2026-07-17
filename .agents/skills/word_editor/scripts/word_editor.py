@@ -148,11 +148,10 @@ def cmd_apply(changes_file):
             find_text = rule.get("find", "")
             replace_text = rule.get("replace", "")
             max_replacements = rule.get("max_replacements", 1)
-            comment = rule.get("comment", f"Rule {i}")
 
             if "^" in find_text or "^" in replace_text:
                 print(
-                    f"  [WARN] Rule {i}: Chuỗi chứa '^' — Word sẽ diễn giải như ký tự đặc biệt. Kiểm tra kết quả. | {comment}"
+                    f"  [WARN] Rule {i}: Chuỗi chứa '^' — Word sẽ diễn giải như ký tự đặc biệt. Kiểm tra kết quả."
                 )
 
             target_range = None
@@ -171,11 +170,13 @@ def cmd_apply(changes_file):
                         table.Rows.Add()
                         added_rows += 1
                     if added_rows > 0:
-                        print(f"  [INFO] Table[{t_idx-1}]: Đã chèn thêm {added_rows} hàng mới (Tổng số hàng hiện tại: {table.Rows.Count}) | {comment}")
+                        print(
+                            f"  [INFO] Table[{t_idx-1}]: Đã chèn thêm {added_rows} hàng mới (Tổng số hàng hiện tại: {table.Rows.Count})"
+                        )
                     target_range = table.Cell(r_idx, c_idx).Range
                 except Exception as e:
                     print(
-                        f"  [ERROR] Rule {i}: Không lấy được Table[{t_idx-1}] R{r_idx-1}C{c_idx-1}: {e} | {comment}"
+                        f"  [ERROR] Rule {i}: Không lấy được Table[{t_idx-1}] R{r_idx-1}C{c_idx-1}: {e}"
                     )
                     continue
 
@@ -190,12 +191,14 @@ def cmd_apply(changes_file):
                     found_para = None
                     for para in doc.Paragraphs:
                         para_text = para.Range.Text
-                        if anchor in para_text and (not find_text or find_text in para_text):
+                        if anchor in para_text and (
+                            not find_text or find_text in para_text
+                        ):
                             found_para = para
                             break
                     if found_para is None:
                         print(
-                            f"  [MISS] Rule {i}: Không tìm thấy anchor='{anchor[:50]}' | {comment}"
+                            f"  [MISS] Rule {i}: Không tìm thấy anchor='{anchor[:50]}'"
                         )
                         continue
                     target_range = found_para.Range
@@ -205,36 +208,36 @@ def cmd_apply(changes_file):
                         target_range = doc.Paragraphs(p_idx + 1).Range
                     except Exception as e:
                         print(
-                            f"  [ERROR] Rule {i}: paragraph_index={p_idx} không hợp lệ: {e} | {comment}"
+                            f"  [ERROR] Rule {i}: paragraph_index={p_idx} không hợp lệ: {e}"
                         )
                         continue
                     # find_text vẫn phải khớp trong đoạn này nếu find_text không rỗng
                     if find_text and find_text not in target_range.Text:
                         print(
                             f"  [MISS] Rule {i}: paragraph_index={p_idx} không chứa find_text='{find_text[:50]}' "
-                            f"— khả năng file đã bị thay đổi kể từ lúc --read. | {comment}"
+                            f"— khả năng file đã bị thay đổi kể từ lúc --read."
                         )
                         continue
 
                 else:
                     print(
-                        f"  [ERROR] Rule {i}: Scope 'paragraph' cần 'anchor' hoặc 'paragraph_index'. | {comment}"
+                        f"  [ERROR] Rule {i}: Scope 'paragraph' cần 'anchor' hoặc 'paragraph_index'."
                     )
                     continue
 
             else:
                 print(
-                    f"  [ERROR] Rule {i}: Scope không hợp lệ '{scope}'. Dùng 'paragraph' hoặc 'table_cell'. | {comment}"
+                    f"  [ERROR] Rule {i}: Scope không hợp lệ '{scope}'. Dùng 'paragraph' hoặc 'table_cell'."
                 )
                 continue
 
             if not find_text:
                 try:
                     target_range.Text = replace_text
-                    print(f"  [OK]   Rule {i}: [direct write] → '{replace_text}' | {comment}")
+                    print(f"  [OK]   Rule {i}: [direct write] → '{replace_text}'")
                     total_replaced += 1
                 except Exception as e:
-                    print(f"  [ERROR] Rule {i}: Ghi trực tiếp thất bại: {e} | {comment}")
+                    print(f"  [ERROR] Rule {i}: Ghi trực tiếp thất bại: {e}")
                 continue
 
             n = _replace_in_range(
@@ -248,12 +251,12 @@ def cmd_apply(changes_file):
             if n > 0:
                 limit_str = "ALL" if max_replacements == 0 else str(max_replacements)
                 print(
-                    f"  [OK]   Rule {i}: [max={limit_str}] '{find_text}' → '{replace_text}' ({n}x thực tế) | {comment}"
+                    f"  [OK]   Rule {i}: [max={limit_str}] '{find_text}' → '{replace_text}' ({n}x thực tế)"
                 )
                 total_replaced += n
             else:
                 print(
-                    f"  [MISS] Rule {i}: '{find_text}' không tìm thấy trong target range | {comment}"
+                    f"  [MISS] Rule {i}: '{find_text}' không tìm thấy trong target range"
                 )
 
         print(
