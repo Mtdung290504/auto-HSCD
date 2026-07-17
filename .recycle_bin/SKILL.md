@@ -24,7 +24,7 @@ Always delegate comparison to Microsoft Word Compare.
 
 Run:
 
-python doc-diff.py "<original>" "<edited>" "<output>"
+python doc_diff.py "<original>" "<edited>" "<output>"
 
 ---
 

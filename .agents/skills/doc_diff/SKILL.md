@@ -20,7 +20,7 @@ Script cần:
 Chạy script so sánh:
 
 ```bash
-python ".agents/skills/doc_diff/scripts/doc-diff.py" "<file_docx_gốc>" "<file_docx_đã_sửa>" "<đường_dẫn_file_output_check_docx>"
+python ".agents/skills/doc_diff/scripts/doc_diff.py" "<file_docx_gốc>" "<file_docx_đã_sửa>" "<đường_dẫn_file_output_check_docx>"
 ```
 
 ## Output

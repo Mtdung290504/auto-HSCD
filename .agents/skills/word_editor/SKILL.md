@@ -23,12 +23,12 @@ Agent sinh `changes.json` phù hợp với từng phiên; script chỉ là execu
 
 ---
 
-## `--read`: cấu trúc output
+## `--read`: Trích xuất cấu trúc văn bản
 
-Output là JSON nén (không indent) để giảm token — parse trực tiếp, không cần định dạng đẹp.
+Lưu cấu trúc văn bản của tệp Word ra file JSON chỉ định:
 
 ```powershell
-python word_editor.py --read "sessions/<tên_phiên>/temp/filled_temp.docx"
+python word_editor.py --read "sessions/<tên_phiên>/temp/filled_temp.docx" "sessions/<tên_phiên>/word_structure.json"
 ```
 
 ```json

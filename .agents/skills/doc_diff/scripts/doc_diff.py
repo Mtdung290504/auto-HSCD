@@ -128,7 +128,7 @@ def compare_word_docs(orig_path, filled_path, output_path):
 def main():
     if len(sys.argv) != 4:
         print(
-            "Usage:\n" "python doc-diff.py original.docx edited.docx output.check.docx"
+            "Usage:\n" "python doc_diff.py original.docx edited.docx output.check.docx"
         )
         sys.exit(1)
 

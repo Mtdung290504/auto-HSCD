@@ -4,15 +4,18 @@ Part of the word_editor skill. Cách dùng, cấu trúc changes.json, và giới
 hạn kỹ thuật: xem SKILL.md.
 
 Usage:
-  python word_editor.py --read  <file.docx>       # Đọc cấu trúc file
-  python word_editor.py --apply <changes.json>    # Thực thi thay thế
+  python word_editor.py --read  <file.docx> <output.json> # Đọc cấu trúc file và ghi ra JSON
+  python word_editor.py --apply <changes.json>            # Thực thi thay thế
 """
 
 import sys
 import os
 import json
 
-sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
 
 # Giới hạn của Word Find/Replace engine — chỉ dùng để in cảnh báo thông tin,
 # KHÔNG còn là giới hạn cứng vì _replace_in_range dùng TypeText, không dùng
@@ -23,7 +26,7 @@ WORD_REPLACE_MAX_LEN = 250
 # ===========================================================
 # MODE: --read — đọc cấu trúc file qua Word COM
 # ===========================================================
-def cmd_read(file_path):
+def cmd_read(file_path, output_json_path):
     import win32com.client
     import pythoncom
 
@@ -94,7 +97,12 @@ def cmd_read(file_path):
                 table_entry["unreadable_cells"] = unreadable
             result["tables"].append(table_entry)
 
-        print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
+        out_dir = os.path.dirname(output_json_path)
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
+        with open(output_json_path, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, separators=(",", ":"))
+        print(f"[SUCCESS] Saved Word structure JSON to: {output_json_path}")
 
     finally:
         if doc is not None:
@@ -328,14 +336,18 @@ def main():
     mode = args[0]
 
     if mode == "--read":
-        if len(args) < 2:
-            print("[ERROR] --read cần đường dẫn file .docx")
+        if len(args) < 3:
+            print(
+                "[ERROR] --read cần đường dẫn file .docx và đường dẫn file output JSON"
+            )
+            print("Usage: python word_editor.py --read <file.docx> <output_json_path>")
             sys.exit(1)
         file_path = os.path.abspath(args[1])
+        output_json_path = os.path.abspath(args[2])
         if not os.path.exists(file_path):
             print(f"[ERROR] File không tồn tại: {file_path}")
             sys.exit(1)
-        cmd_read(file_path)
+        cmd_read(file_path, output_json_path)
 
     elif mode == "--apply":
         if len(args) < 2:

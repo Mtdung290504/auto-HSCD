@@ -6,6 +6,8 @@ import openpyxl
 # Set UTF-8 encoding for console output on Windows
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
 
 
 def clean_cell_value(val):
@@ -188,7 +190,7 @@ def excel_to_json(filepath, output_path, include_hidden=False):
         if out_dir:
             os.makedirs(out_dir, exist_ok=True)
         with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(result, f, ensure_ascii=False, indent=2)
+            json.dump(result, f, ensure_ascii=False, separators=(",", ":"))
         print(f"[SUCCESS] Saved Excel JSON data to: {output_path}")
     except Exception as e:
         print(f"Error writing JSON to file: {e}")
