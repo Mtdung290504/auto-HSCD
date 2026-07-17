@@ -1,1 +1,0 @@
-Hình như khi dùng MCP safe-docx, phải close file trước đó nếu không readfile sẽ dính cache?

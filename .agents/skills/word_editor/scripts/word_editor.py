@@ -1,15 +1,11 @@
 """
 word_editor.py - Universal Word document editor
-Part of the word_editor skill.
+Part of the word_editor skill. Cách dùng, cấu trúc changes.json, và giới
+hạn kỹ thuật: xem SKILL.md.
 
 Usage:
   python word_editor.py --read  <file.docx>       # Đọc cấu trúc file
   python word_editor.py --apply <changes.json>    # Thực thi thay thế
-
-Lưu ý kỹ thuật:
-- --read dùng python-docx (chỉ đọc body paragraphs, không tính paragraph trong bảng)
-- --apply dùng Word COM — replace trong Range cụ thể, không phải toàn file
-- Không hỗ trợ paragraph_index vì index python-docx và COM không tương đương khi có bảng
 """
 
 import sys
@@ -18,86 +14,117 @@ import json
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-# Giới hạn của Word Find/Replace engine
-WORD_REPLACE_MAX_LEN = 250  # Thực tế giới hạn ~255, để an toàn dùng 250
+# Giới hạn của Word Find/Replace engine — chỉ dùng để in cảnh báo thông tin,
+# KHÔNG còn là giới hạn cứng vì _replace_in_range dùng TypeText, không dùng
+# Find.Execute(Replace=...).
+WORD_REPLACE_MAX_LEN = 250
 
 
 # ===========================================================
-# MODE: --read
-# Dùng python-docx để đọc cấu trúc (nhanh, không cần COM).
-# CHÚ Ý: paragraphs chỉ liệt kê body-level paragraphs,
-# KHÔNG bao gồm paragraph bên trong ô bảng.
-# Dùng kết quả này để xác định anchor và find text,
-# KHÔNG dùng index paragraph để targeting trong --apply.
+# MODE: --read — đọc cấu trúc file qua Word COM
 # ===========================================================
 def cmd_read(file_path):
-    import docx
+    import win32com.client
+    import pythoncom
 
-    doc = docx.Document(file_path)
-    result = {
-        "file": file_path,
-        "paragraph_count": len(doc.paragraphs),
-        "table_count": len(doc.tables),
-        "warning": "paragraph index trong output này KHÔNG tương đương với COM index khi có bảng. Chỉ dùng để xác định anchor/find text.",
-        "paragraphs": [],
-        "tables": [],
-    }
+    pythoncom.CoInitialize()
+    word = None
+    doc = None
 
-    for idx, para in enumerate(doc.paragraphs):
-        result["paragraphs"].append({"index": idx, "text": para.text.strip()})
-
-    for t_idx, table in enumerate(doc.tables):
-        table_data = {
-            "index": t_idx,
-            "rows": len(table.rows),
-            "cols": len(table.columns),
-            "cells": [],
-        }
-        seen = set()
-        for r_idx, row in enumerate(table.rows):
-            for c_idx, cell in enumerate(row.cells):
-                cell_id = id(cell._tc)
-                if cell_id in seen:
-                    continue
-                seen.add(cell_id)
-                table_data["cells"].append(
-                    {
-                        "row": r_idx,
-                        "col": c_idx,
-                        "text": cell.text.strip().replace("\n", " "),
-                        "note": (
-                            "Merged cell: tọa độ COM có thể lệch"
-                            if _is_merged(cell)
-                            else None
-                        ),
-                    }
-                )
-        result["tables"].append(table_data)
-
-    print(json.dumps(result, ensure_ascii=False, indent=2))
-
-
-def _is_merged(cell):
-    """Kiểm tra ô bảng có phải merge cell không."""
     try:
-        tc = cell._tc
-        return (
-            tc.get(
-                "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}vMerge"
-            )
-            is not None
-            or tc.get(
-                "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}gridSpan"
-            )
-            is not None
-        )
-    except Exception:
-        return False
+        print("[INFO] Khởi động Microsoft Word để đọc (COM)...", file=sys.stderr)
+        word = win32com.client.Dispatch("Word.Application")
+        word.Visible = False
+        doc = word.Documents.Open(file_path, ReadOnly=True)
+
+        result = {
+            "file": file_path,
+            "paragraph_count": doc.Paragraphs.Count,
+            "table_count": doc.Tables.Count,
+            "note": (
+                "paragraph.index và table.index được đọc bằng Word COM — "
+                "khớp trực tiếp với index dùng trong --apply. "
+                "Ưu tiên anchor cho nội dung có thể lặp lại; dùng "
+                "paragraph_index chỉ khi anchor không đủ phân biệt."
+            ),
+            "warning_scope": (
+                "Không bao gồm text trong textbox, header/footer, "
+                "footnote/endnote — ngoài phạm vi công việc, các story "
+                "này nằm ngoài doc.Paragraphs/doc.Tables main story."
+            ),
+            "paragraphs": [],
+            "tables": [],
+        }
+
+        # ---- Paragraphs (1-based COM -> xuất 0-based cho JSON) ----
+        para_count = doc.Paragraphs.Count
+        for i in range(1, para_count + 1):
+            try:
+                text = doc.Paragraphs(i).Range.Text
+                # Word trả về ký tự pilcrow/control ở cuối Range.Text, strip cho sạch
+                text = text.replace("\r", "").replace("\x07", "").strip()
+            except Exception as e:
+                text = f"[ERROR đọc paragraph {i}: {e}]"
+            result["paragraphs"].append({"index": i - 1, "text": text})
+
+        # ---- Tables (1-based COM -> xuất 0-based cho JSON) ----
+        table_count = doc.Tables.Count
+        for t in range(1, table_count + 1):
+            table = doc.Tables(t)
+            try:
+                n_rows = table.Rows.Count
+                n_cols = table.Columns.Count
+            except Exception as e:
+                result["tables"].append(
+                    {"index": t - 1, "error": f"Không đọc được kích thước bảng: {e}"}
+                )
+                continue
+
+            table_data = {"index": t - 1, "rows": n_rows, "cols": n_cols, "cells": []}
+
+            for r in range(1, n_rows + 1):
+                for c in range(1, n_cols + 1):
+                    try:
+                        cell = table.Cell(r, c)
+                        cell_text = (
+                            cell.Range.Text.replace("\r", "")
+                            .replace("\x07", "")
+                            .strip()
+                        )
+                        table_data["cells"].append(
+                            {
+                                "row": r - 1,
+                                "col": c - 1,
+                                "text": cell_text,
+                                "merged_or_unreadable": False,
+                            }
+                        )
+                    except Exception:
+                        # Cell(r,c) ném lỗi -> tọa độ này rơi vào vùng merge
+                        # hoặc không tồn tại độc lập. Đánh dấu rõ, KHÔNG suy đoán text.
+                        table_data["cells"].append(
+                            {
+                                "row": r - 1,
+                                "col": c - 1,
+                                "text": None,
+                                "merged_or_unreadable": True,
+                            }
+                        )
+
+            result["tables"].append(table_data)
+
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+
+    finally:
+        if doc is not None:
+            doc.Close(False)
+        if word is not None:
+            word.Quit()
+        pythoncom.CoUninitialize()
 
 
 # ===========================================================
-# MODE: --apply
-# Dùng Word COM để thực thi thay thế trong Range cụ thể.
+# MODE: --apply — thực thi thay thế trong Range cụ thể qua Word COM
 # ===========================================================
 def cmd_apply(changes_file):
     import win32com.client
@@ -139,7 +166,6 @@ def cmd_apply(changes_file):
             scope = rule.get("scope", "paragraph")
             find_text = rule.get("find", "")
             replace_text = rule.get("replace", "")
-            # max_replacements: số lần tối đa cần thay (0 = không giới hạn, thay tất cả trong Range)
             max_replacements = rule.get("max_replacements", 1)
             comment = rule.get("comment", f"Rule {i}")
 
@@ -155,45 +181,63 @@ def cmd_apply(changes_file):
             target_range = None
 
             # --------------------------------------------------
-            # Scope: table_cell — chính xác nhất
+            # Scope: table_cell — chính xác nhất cho nội dung dạng bảng
             # --------------------------------------------------
             if scope == "table_cell":
-                t_idx = rule.get("table_index", 0) + 1  # 0-based → 1-based
+                t_idx = rule.get("table_index", 0) + 1
                 r_idx = rule.get("row_index", 0) + 1
                 c_idx = rule.get("col_index", 0) + 1
                 try:
                     target_range = doc.Tables(t_idx).Cell(r_idx, c_idx).Range
                 except Exception as e:
                     print(
-                        f"  [ERROR] Rule {i}: Không lấy được Table[{t_idx-1}] R{r_idx-1}C{c_idx-1}: {e} | {comment}"
+                        f"  [ERROR] Rule {i}: Không lấy được Table[{t_idx-1}] R{r_idx-1}C{c_idx-1} "
+                        f"(có thể là merged cell): {e} | {comment}"
                     )
                     continue
 
             # --------------------------------------------------
-            # Scope: paragraph — chỉ hỗ trợ anchor (không index)
+            # Scope: paragraph — anchor ưu tiên, fallback paragraph_index
             # --------------------------------------------------
             elif scope == "paragraph":
                 anchor = rule.get("anchor")
-                if not anchor:
+                p_idx = rule.get("paragraph_index")
+
+                if anchor:
+                    found_para = None
+                    for para in doc.Paragraphs:
+                        para_text = para.Range.Text
+                        if anchor in para_text and find_text in para_text:
+                            found_para = para
+                            break
+                    if found_para is None:
+                        print(
+                            f"  [MISS] Rule {i}: Không tìm thấy anchor='{anchor[:50]}' | {comment}"
+                        )
+                        continue
+                    target_range = found_para.Range
+
+                elif p_idx is not None:
+                    try:
+                        target_range = doc.Paragraphs(p_idx + 1).Range
+                    except Exception as e:
+                        print(
+                            f"  [ERROR] Rule {i}: paragraph_index={p_idx} không hợp lệ: {e} | {comment}"
+                        )
+                        continue
+                    # find_text vẫn phải khớp trong đoạn này, không sửa mù theo index
+                    if find_text not in target_range.Text:
+                        print(
+                            f"  [MISS] Rule {i}: paragraph_index={p_idx} không chứa find_text='{find_text[:50]}' "
+                            f"— khả năng file đã bị thay đổi kể từ lúc --read. | {comment}"
+                        )
+                        continue
+
+                else:
                     print(
-                        f"  [ERROR] Rule {i}: Scope 'paragraph' yêu cầu 'anchor'. paragraph_index không được hỗ trợ. | {comment}"
+                        f"  [ERROR] Rule {i}: Scope 'paragraph' cần 'anchor' hoặc 'paragraph_index'. | {comment}"
                     )
                     continue
-
-                found_para = None
-                for para in doc.Paragraphs:
-                    para_text = para.Range.Text
-                    if anchor in para_text and find_text in para_text:
-                        found_para = para
-                        break
-
-                if found_para is None:
-                    print(
-                        f"  [MISS] Rule {i}: Không tìm thấy anchor='{anchor[:50]}' | {comment}"
-                    )
-                    continue
-
-                target_range = found_para.Range
 
             else:
                 print(
@@ -201,9 +245,6 @@ def cmd_apply(changes_file):
                 )
                 continue
 
-            # --------------------------------------------------
-            # Thực thi replacement trong Range
-            # --------------------------------------------------
             n = _replace_in_range(
                 word_range=target_range,
                 find_text=find_text,
@@ -241,10 +282,8 @@ def cmd_apply(changes_file):
     finally:
         if doc is not None:
             if show_ui and not saved:
-                # Lỗi trước khi save, giữ Word mở để debug
                 print("[INFO] Lỗi trước khi save — giữ Word mở để kiểm tra.")
             elif show_ui and saved:
-                # Lưu thành công, giữ Word mở theo yêu cầu
                 print("[INFO] Word UI vẫn mở. Đóng thủ công khi xong.")
             else:
                 doc.Close(False)
@@ -253,29 +292,12 @@ def cmd_apply(changes_file):
         pythoncom.CoUninitialize()
 
 
-# ===========================================================
-# HELPER: Thực thi replace trong một Range cụ thể
-#
-# Dùng loop Find.Execute() + Selection.TypeText() cho MỌI trường hợp.
-# Lý do không dùng Find.Execute(Replace=wdReplaceOne/All):
-#   - wdReplaceOne/All chỉ có 2 trạng thái, không hỗ trợ N lần
-#   - Trả về bool, không trả được count thực tế
-#   - Bị giới hạn 255 ký tự với replace_text dài
-#
-# Loop TypeText giải quyết cả 3 vấn đề:
-#   - Hỗ trợ chính xác max_replacements lần
-#   - Trả về count thực tế
-#   - Không giới hạn độ dài replace_text
-#   - Formatting gốc được bảo toàn (TypeText thay thế Selection hiện tại)
-#
-# max_replacements: số lần tối đa (0 = không giới hạn)
-# ===========================================================
 def _replace_in_range(
     word_range, find_text, replace_text, max_replacements=1, word_app=None
 ):
     if len(replace_text) > WORD_REPLACE_MAX_LEN:
         print(
-            f"    [INFO] replace_text dài ({len(replace_text)} ký tự) — vượt giới hạn 255 ký tự của Word Find engine, dùng TypeText."
+            f"    [INFO] replace_text dài ({len(replace_text)} ký tự) — dùng TypeText, không bị giới hạn 255 ký tự."
         )
 
     find_obj = word_range.Find
@@ -291,8 +313,6 @@ def _replace_in_range(
     unlimited = max_replacements == 0
 
     while find_obj.Execute():
-        # Find.Execute() đặt Selection vào vùng text vừa tìm được
-        # TypeText thay thế Selection đó — Word tự xử lý formatting
         word_app.Selection.TypeText(replace_text)
         count += 1
         if not unlimited and count >= max_replacements:
@@ -301,9 +321,6 @@ def _replace_in_range(
     return count
 
 
-# ===========================================================
-# ENTRY POINT
-# ===========================================================
 def main():
     args = sys.argv[1:]
 

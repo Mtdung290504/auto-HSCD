@@ -3,53 +3,30 @@ name: doc_diff
 description: Generate a native Microsoft Word Track Changes document by comparing an original document with an edited document. Use this skill whenever a reviewable Word document with Track Changes is required.
 ---
 
-# Word Document Comparison
+# So Sánh Tài Liệu Word
 
-This skill generates a native Microsoft Word Track Changes document by comparing an original document with an edited document using Microsoft Word's built-in Compare feature.
+Skill này tạo file Track Changes gốc của Microsoft Word bằng cách so sánh tài liệu gốc với tài liệu đã chỉnh sửa, sử dụng tính năng Compare có sẵn của Microsoft Word.
 
-## When to use
+## Đầu vào
 
-Use this skill whenever the workflow requires:
+Script cần:
 
-- generating Track Changes;
-- producing a reviewable Word document;
-- comparing an original document with its edited version.
+- Tài liệu gốc (`.docx`)
+- Tài liệu đã chỉnh sửa (`.docx`)
+- Đường dẫn file output (`.check.docx`)
 
-Do **not** implement your own document comparison algorithm.
+## Thực thi
 
-Always delegate document comparison to Microsoft Word through this skill.
-
-## Inputs
-
-The script requires:
-
-- Original document (`.docx`)
-- Edited document (`.docx`)
-- Output document path (`.check.docx`)
-
-## Execution
-
-Run the comparison script:
+Chạy script so sánh:
 
 ```bash
-python "c:/z-Information Security Level Profile/.agents/skills/doc_diff/scripts/doc-diff.py" "<original_docx>" "<edited_docx>" "<output_check_docx>"
+python ".agents/skills/doc_diff/scripts/doc-diff.py" "<file_docx_gốc>" "<file_docx_đã_sửa>" "<đường_dẫn_file_output_check_docx>"
 ```
 
 ## Output
 
-The script produces:
+Script tạo ra:
 
-- one `.check.docx` document;
-- native Microsoft Word Track Changes;
-- all detected insertions, deletions, and formatting changes handled by Microsoft Word.
-
-The generated `.check.docx` file should be treated as the final review document.
-
-## Failure Handling
-
-If the script exits with a non-zero exit code or reports an error:
-
-- stop the current workflow;
-- report the error to the user;
-- do not claim the document was successfully generated;
-- do not replace this workflow with another comparison method.
+- một file `.check.docx`;
+- Track Changes gốc của Microsoft Word;
+- toàn bộ insertion, deletion và thay đổi định dạng do Microsoft Word phát hiện và xử lý.
