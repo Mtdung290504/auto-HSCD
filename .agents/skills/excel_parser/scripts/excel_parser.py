@@ -131,7 +131,7 @@ def render_sheet_markdown(sheet):
     return "\n".join(lines)
 
 
-def excel_to_markdown(filepath, include_hidden=False):
+def excel_to_markdown_string(filepath, include_hidden=False):
     if not os.path.exists(filepath):
         print(f"Error: File not found: {filepath}")
         sys.exit(1)
@@ -142,7 +142,8 @@ def excel_to_markdown(filepath, include_hidden=False):
         print(f"Error loading Excel file: {e}")
         sys.exit(1)
 
-    print(f"# EXCEL DATA DUMP: {os.path.basename(filepath)}\n")
+    lines = []
+    lines.append(f"# EXCEL DATA DUMP: {os.path.basename(filepath)}\n")
 
     any_sheet_shown = False
     for sheet in wb.worksheets:
@@ -151,12 +152,16 @@ def excel_to_markdown(filepath, include_hidden=False):
             continue
         any_sheet_shown = True
         try:
-            print(render_sheet_markdown(sheet))
+            lines.append(render_sheet_markdown(sheet))
         except Exception as e:
-            print(f"## Sheet: {sheet.title}\n*Error reading this sheet: {e}*\n")
+            lines.append(f"## Sheet: {sheet.title}\n*Error reading this sheet: {e}*\n")
 
     if not any_sheet_shown:
-        print("*No visible sheets found. Re-run with --all to include hidden sheets.*")
+        lines.append(
+            "*No visible sheets found. Re-run with --all to include hidden sheets.*"
+        )
+
+    return "\n".join(lines)
 
 
 def excel_to_json(filepath, output_path, include_hidden=False):
@@ -197,30 +202,49 @@ def excel_to_json(filepath, output_path, include_hidden=False):
         sys.exit(1)
 
 
+def excel_to_json_and_md(excel_path, output_path, include_hidden=False):
+    # Strip extension from output_path
+    base_path, _ = os.path.splitext(output_path)
+    json_path = base_path + ".json"
+    md_path = base_path + ".md"
+
+    # 1. Save JSON
+    excel_to_json(excel_path, json_path, include_hidden)
+
+    # 2. Save MD
+    md_content = excel_to_markdown_string(excel_path, include_hidden)
+    try:
+        out_dir = os.path.dirname(md_path)
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
+        with open(md_path, "w", encoding="utf-8") as f:
+            f.write(md_content)
+        print(f"[SUCCESS] Saved Excel Markdown data to: {md_path}")
+    except Exception as e:
+        print(f"Error writing Markdown to file: {e}")
+        sys.exit(1)
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     if not args or args[0] in ("-h", "--help"):
         print("Usage:")
-        print("  Mặc định (Xuất JSON ra file):")
+        print("  Xuất cấu trúc file Excel ra đồng thời cả file JSON và MD:")
         print(
-            "    python excel_parser.py <path_to_excel_file> <output_json_file> [--all]"
+            "    python excel_parser.py <path_to_excel_file> <output_base_path> [--all]"
         )
-        print("  Xuất Markdown (ra stdout):")
-        print("    python excel_parser.py <path_to_excel_file> --md [--all]")
         sys.exit(0)
 
     excel_path = args[0]
     include_hidden = "--all" in args
 
-    if "--md" in args or "--markdown" in args:
-        excel_to_markdown(excel_path, include_hidden)
-    else:
-        remaining_args = [a for a in args[1:] if a != "--all"]
-        if not remaining_args:
-            print("Error: Default mode requires an output JSON file path.")
-            print(
-                "Usage: python excel_parser.py <path_to_excel_file> <output_json_file> [--all]"
-            )
-            sys.exit(1)
-        output_json_path = remaining_args[0]
-        excel_to_json(excel_path, output_json_path, include_hidden)
+    remaining_args = [a for a in args[1:] if a != "--all"]
+    if not remaining_args:
+        print("Error: This tool requires an output base path.")
+        print(
+            "Usage: python excel_parser.py <path_to_excel_file> <output_base_path> [--all]"
+        )
+        sys.exit(1)
+
+    output_base_path = remaining_args[0]
+    excel_to_json_and_md(excel_path, output_base_path, include_hidden)

@@ -25,11 +25,18 @@ Agent sinh `changes.json` phù hợp với từng phiên; script chỉ là execu
 
 ## `--read`: Trích xuất cấu trúc văn bản
 
-Lưu cấu trúc văn bản của tệp Word ra file JSON chỉ định:
+Lưu cấu trúc văn bản của tệp Word ra file JSON và Markdown chỉ định (lược bỏ phần mở rộng đuôi tệp khi truyền vào đối số):
 
 ```powershell
-python word_editor.py --read "sessions/<tên_phiên>/temp/filled_temp.docx" "sessions/<tên_phiên>/word_structure.json"
+python word_editor.py --read "sessions/<tên_phiên>/temp/filled_temp.docx" "sessions/<tên_phiên>/temp/word_structure"
 ```
+
+Lệnh này sinh ra đồng thời hai file:
+
+1. `word_structure.json`: Chứa cấu trúc JSON cho script ánh xạ tự động.
+2. `word_structure.md`: Chứa outline dạng Markdown có cấu trúc phân cấp (các đoạn văn được ghi trực tiếp trên từng dòng và các bảng biểu dạng Markdown Table được đánh số chỉ số hàng/cột trực quan để xem nhanh).
+
+### Cấu trúc file JSON sinh ra:
 
 ```json
 {

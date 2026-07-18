@@ -1,27 +1,26 @@
 ---
-name: excel_reader
+name: excel_parser
 description: "Use this skill whenever the user asks to read, open, analyze, summarize, or inspect an Excel file (.xlsx). Triggers include: any mention of an Excel file, spreadsheet, workbook, '.xlsx', 'file excel', 'bảng tính', 'file .xlsx', or a request to understand what's inside an Excel file. Converts every visible sheet into a clean Markdown table so the content can be read directly. Do NOT use for .xls (legacy binary Excel), .csv, or for writing/editing Excel files."
 ---
 
 # Skill Đọc File Excel
 
-Đọc một file `.xlsx` nhỏ và chuyển từng sheet thành bảng Markdown, in ra stdout. Được thiết kế cho file nhỏ, cần đọc và hiểu toàn bộ nội dung — script không phân trang hay cắt bớt dữ liệu.
+Đọc một file `.xlsx` nhỏ và chuyển đổi đồng thời ra cả file JSON cấu trúc và file Markdown để mô hình/người dùng đọc trực tiếp. Được thiết kế cho file nhỏ, cần đọc và hiểu toàn bộ nội dung — script không phân trang hay cắt bớt dữ liệu.
 
 ## Cách dùng
 
-Chạy script, truyền vào đường dẫn tới file Excel. Đường dẫn script bên dưới là đường dẫn tương đối so với thư mục chứa skill này.
-
-1. **Chuyển đổi sang JSON (xuất ra file) - Mặc định**:
+Chạy script, truyền vào đường dẫn tới file Excel và đường dẫn đầu ra (bỏ qua phần mở rộng). Đường dẫn script bên dưới là đường dẫn tương đối so với thư mục chứa skill này.
 
 ```bash
-python ".agents/skills/excel_reader/scripts/excel_parser.py" "<đường_dẫn_file_excel>" "<đường_dẫn_file_ra.json>" [--all]
+python ".agents/skills/excel_parser/scripts/excel_parser.py" "<đường_dẫn_file_excel>" "<đường_dẫn_đầu_ra_không_đuôi>" [--all]
 ```
 
-2. **Chuyển đổi sang Markdown (in ra stdout)**:
+Lệnh này sẽ tự động sinh ra đồng thời hai file:
 
-```bash
-python ".agents/skills/excel_reader/scripts/excel_parser.py" "<đường_dẫn_file_excel>" --md [--all]
-```
+1. `<đường_dẫn_đầu_ra_không_đuôi>.json`: File chứa cấu trúc dữ liệu JSON để ánh xạ tự động.
+2. `<đường_dẫn_đầu_ra_không_đuôi>.md`: File Markdown chứa các bảng dữ liệu trực quan để xem nhanh.
+
+- **Tham số `--all`**: Dùng để xử lý cả các sheet ẩn (hidden sheets). **Lưu ý**: Không được sử dụng tham số này trừ khi người dùng có yêu cầu cụ thể.
 
 ## Định dạng output
 
@@ -54,9 +53,9 @@ Lưu dữ liệu ra tệp JSON dưới dạng grid mảng hai chiều:
 - `*Sheet is empty.*` / `*Sheet has only empty cells.*` nghĩa là sheet đó không có dữ liệu sử dụng được.
 - Các dòng/cột trống ở cuối bảng được tự động cắt bỏ.
 
-### 2. Định dạng Markdown (khi dùng `--md`)
+### 2. Định dạng Markdown (Lưu trong file .md)
 
-Stdout là Markdown, có cấu trúc như sau:
+Nội dung file .md là Markdown, có cấu trúc như sau:
 
 ```
 # EXCEL DATA DUMP: <tên_file>

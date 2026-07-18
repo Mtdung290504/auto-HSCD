@@ -52,3 +52,8 @@ Sau khi clone, tạo thư mục Output\ và Templates\, trong đó:
 
     Thực hiện toàn bộ quy trình theo System Prompt.
     ```
+
+# Note
+
+- Thường thì xử lý cả bộ hồ sơ, nhưng đưa cho agent làm hết 1 lần thì khó kiểm soát lỗi quá.
+- Sẽ lên kế hoạch & sửa trong prompt để agent xử lý tốt trên từng tài liệu lẻ và output các tài liệu để ở cùng 1 nơi mà không bị mâu thuẫn các file temp dù có không xóa temp nhằm mục đích debug.

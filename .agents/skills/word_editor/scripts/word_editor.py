@@ -26,6 +26,45 @@ WORD_REPLACE_MAX_LEN = 250
 # ===========================================================
 # MODE: --read — đọc cấu trúc file qua Word COM
 # ===========================================================
+def render_word_table_markdown(t_idx, table_data):
+    rows = table_data["rows"]
+    cols = table_data["cols"]
+
+    # Khởi tạo grid trống
+    grid = [["" for _ in range(cols)] for _ in range(rows)]
+    for r, c, text in table_data["cells"]:
+        clean_text = (
+            text.replace("|", "\\|")
+            .replace("\r", " ")
+            .replace("\n", " ")
+            .replace("\x0b", " ")
+            .strip()
+        )
+        grid[r][c] = clean_text
+
+    for r, c in table_data.get("unreadable_cells", []):
+        grid[r][c] = "[Merged]"
+
+    lines = []
+    lines.append(f"## Table {t_idx} ({rows} rows x {cols} cols)")
+
+    # Tạo tiêu đề cột kèm chỉ số để dễ quan sát
+    headers = ["Row"] + [f"Col {c}" for c in range(cols)]
+    lines.append("| " + " | ".join(headers) + " |")
+    lines.append("| " + " | ".join(["---"] * len(headers)) + " |")
+
+    # Điền dữ liệu các hàng kèm chỉ số hàng
+    for r in range(rows):
+        row_vals = [str(r)] + grid[r]
+        lines.append("| " + " | ".join(row_vals) + " |")
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+# ===========================================================
+# MODE: --read — đọc cấu trúc file qua Word COM
+# ===========================================================
 def cmd_read(file_path, output_json_path):
     import win32com.client
     import pythoncom
@@ -97,12 +136,42 @@ def cmd_read(file_path, output_json_path):
                 table_entry["unreadable_cells"] = unreadable
             result["tables"].append(table_entry)
 
-        out_dir = os.path.dirname(output_json_path)
+        # Xử lý phần mở rộng
+        base_path, _ = os.path.splitext(output_json_path)
+        json_path = base_path + ".json"
+        md_path = base_path + ".md"
+
+        out_dir = os.path.dirname(json_path)
         if out_dir:
             os.makedirs(out_dir, exist_ok=True)
-        with open(output_json_path, "w", encoding="utf-8") as f:
+
+        # 1. Ghi file JSON
+        with open(json_path, "w", encoding="utf-8") as f:
             json.dump(result, f, ensure_ascii=False, separators=(",", ":"))
-        print(f"[SUCCESS] Saved Word structure JSON to: {output_json_path}")
+        print(f"[SUCCESS] Saved Word structure JSON to: {json_path}")
+
+        # 2. Ghi file MD (Outline cấu trúc)
+        md_lines = []
+        md_lines.append(f"# WORD STRUCTURE DUMP: {os.path.basename(file_path)}\n")
+
+        md_lines.append("# PARAGRAPHS\n")
+        for text in result["paragraphs"]:
+            md_lines.append(text)
+        md_lines.append("\n")
+
+        md_lines.append("# TABLES\n")
+        for i, table_data in enumerate(result["tables"]):
+            if "error" in table_data:
+                md_lines.append(
+                    f"## Table {i}\nError reading table: {table_data['error']}\n"
+                )
+            else:
+                md_lines.append(render_word_table_markdown(i, table_data))
+
+        md_content = "\n".join(md_lines)
+        with open(md_path, "w", encoding="utf-8") as f:
+            f.write(md_content)
+        print(f"[SUCCESS] Saved Word structure MD to: {md_path}")
 
     finally:
         if doc is not None:

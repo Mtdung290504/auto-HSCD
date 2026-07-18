@@ -73,6 +73,7 @@ Phải bảo vệ cấp bậc hành chính của địa danh và cơ quan:
 Không được thay thế địa danh/tên cơ quan cấp cao hơn bằng địa danh/tên cơ quan cấp thấp hơn (trừ khi dữ liệu khảo sát có nêu rõ làm ở cấp tương đương, ví dụ mẫu ghi "ỦY BAN NHÂN DÂN THÀNH PHỐ ĐÀ NẴNG", còn khảo sát ghi rõ làm ở thành phố khác như HÀ NỘI,...). Chỉ thực hiện thay thế nếu địa danh/tên cơ quan trong khảo sát ngang cấp với địa danh/tên cơ quan tương ứng trong mẫu.
 
 Ví dụ:
+
 - Không được sửa "ỦY BAN NHÂN DÂN THÀNH PHỐ ĐÀ NẴNG" (cấp thành phố) thành "ỦY BAN NHÂN DÂN XÃ KHÂM ĐỨC" (cấp xã) vì cấp xã nhỏ hơn cấp thành phố.
 - Được phép sửa "UBND PHƯỜNG HẢI CHÂU" thành "UBND XÃ KHÂM ĐỨC" vì phường và xã là hai đơn vị ngang cấp (đều thuộc cấp xã/phường).
 
@@ -232,6 +233,7 @@ Mọi script Python tự động điền dữ liệu (replace/fill data) do Agen
 Mỗi khi bắt đầu một phiên làm việc, Agent cần xác định tên phiên (Session Name).
 
 Mọi file phát sinh trong quá trình xử lý — bao gồm nhưng không giới hạn:
+
 - orig_temp.docx, filled_temp.docx
 - JSON xuất từ excel_parser.py
 - JSON xuất từ word_editor.py --read
@@ -319,11 +321,12 @@ Luôn tuân thủ:
 Để thực thi chỉnh sửa, sử dụng Skill:
 word_editor
 Quy trình:
+
 1. Gọi `word_editor --read` để xác nhận nội dung `find` và `anchor` khớp với file thực tế.
 2. Sinh file `changes.json` trong thư mục `sessions/<tên_phiên>/`.
 3. Gọi `word_editor --apply` để thực thi.
-Không được tự viết script Python ad-hoc để thay thế văn bản.
-Không dùng python-docx để ghi trực tiếp vào file (vi phạm Preserve Formatting).
+   Không được tự viết script Python ad-hoc để thay thế văn bản.
+   Không dùng python-docx để ghi trực tiếp vào file (vi phạm Preserve Formatting).
 
 ---
 
@@ -380,15 +383,17 @@ Không tự ý xóa hiện vật khi quy trình thất bại.
 
 # AUTOMATION & DATA MAPPING
 
-Để giảm token và tránh lỗi hard-code chuỗi văn bản thủ công, việc ánh xạ dữ liệu Excel sang Word phải đi qua JSON, không được viết tay từng chuỗi.
+Để giảm token và tránh lỗi hard-code chuỗi văn bản thủ công, việc ánh xạ dữ liệu Excel sang Word phải đi qua dữ liệu xuất tự động, không được viết tay từng chuỗi.
 
 Quy trình bắt buộc:
 
-1. Xuất dữ liệu khảo sát ra JSON bằng `excel_parser.py`.
-2. Xuất cấu trúc file Word đích ra JSON bằng `word_editor.py --read`.
-3. Viết một script ánh xạ ngắn gọn (Node.js hoặc Python, dùng thư viện chuẩn) đọc 2 file JSON trên, đối chiếu theo tọa độ [row, col] hoặc paragraph_index, và sinh ra `changes.json` cho `word_editor.py --apply`.
+1. Xuất dữ liệu khảo sát bằng `excel_parser.py` (ra cả `.json` và `.md`).
+2. Xuất cấu trúc file Word đích bằng `word_editor.py --read` (ra cả `.json` và `.md`).
+3. Trong pha Analyze và Planning, ưu tiên đọc file `.md` để định vị tọa độ hàng/cột hoặc anchor — bảng Markdown tốn ít token và dễ đối chiếu vị trí hơn JSON thô. Chỉ đọc `.json` trong trường hợp file MD bị thiếu thông tin cần thiết nào đó mà system prompt chưa tính trước được.
+4. Viết một script ánh xạ ngắn gọn (Node.js hoặc Python, dùng thư viện chuẩn) đọc 2 file JSON trên, đối chiếu theo tọa độ [row, col] hoặc anchor/paragraph_index, và sinh ra `changes.json` cho `word_editor.py --apply`.
 
 Không được:
+
 - viết script dài, hard-code chuỗi văn bản đọc từ Excel trực tiếp vào code;
 - tự tạo logic đọc Word/Excel khác ngoài `excel_parser.py` và `word_editor.py --read`.
 
@@ -401,6 +406,8 @@ Script ánh xạ là script dùng một lần cho phiên làm việc hiện tạ
 Khi chạy Python hoặc các lệnh CLI,
 
 phải sử dụng UTF-8 để tránh UnicodeEncodeError khi xử lý tiếng Việt.
+
+Hãy xem toàn bộ input, output, dữ liệu nhận được là UTF-8 và script phải luôn chỉ định xử lý UTF-8 thay vì để mặc định.
 
 ---
 
