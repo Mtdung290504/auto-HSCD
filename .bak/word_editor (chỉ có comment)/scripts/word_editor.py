@@ -11,27 +11,28 @@ Usage:
 import sys
 import os
 import json
-import re
-import html
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")
 
-# Giới hạn của Word Find/Replace engine
+# Giới hạn của Word Find/Replace engine — chỉ dùng để in cảnh báo thông tin,
+# KHÔNG còn là giới hạn cứng vì _replace_in_range dùng Range.Text, không dùng
+# Find.Execute(Replace=...).
 WORD_REPLACE_MAX_LEN = 250
 
-# Marker dùng để đánh dấu comment trong file .md
-COMMENT_MARK = "%%COMMENT"
+# Marker dùng để đánh dấu comment trong file .md — xem SKILL.md mục "Comment
+# trong file MD" để biết quy ước đầy đủ.
+COMMENT_MARK = "%%COMMENT"  # tiền tố chung, dùng để escape nội dung gốc
 COMMENT_START_TPL = "%%COMMENT_START:{id}%%"
 COMMENT_END_TPL = "%%COMMENT:{id}%%"
 
 
 def _escape_comment_marks(text):
-    """Nếu nội dung gốc tài liệu tình cờ chứa chuỗi marker, phá vỡ nó bằng khoảng trắng."""
-    if not text:
-        return ""
+    """Nếu nội dung gốc tài liệu tình cờ chứa chuỗi marker, phá vỡ nó bằng
+    cách chèn khoảng trắng, để không bị hiểu nhầm là comment marker thật khi
+    agent đọc lại file .md."""
     return text.replace(COMMENT_MARK, "%% COMMENT")
 
 
@@ -41,83 +42,12 @@ def _clean_raw_text(text):
 
 
 # ===========================================================
-# MODE: --read — helpers cho comment & xml parsing
+# MODE: --read — helpers cho comment
 # ===========================================================
-
-
-def _get_styled_text_from_xml(xml_string):
-    """
-    Quét mã WordOpenXML, trích xuất text trong các block <w:r>.
-    CHỈ lấy màu chữ (font color). Các khối cùng màu đứng cạnh nhau sẽ được gộp.
-    Dùng thẻ <r> để tiết kiệm token.
-    """
-    if not xml_string:
-        return None
-
-    runs = re.findall(r"<w:r(?: [^>]+)?>.*?</w:r>", xml_string, re.DOTALL)
-    if not runs:
-        return None
-
-    parsed_runs = []
-
-    for run_xml in runs:
-        style = None
-
-        rPr_match = re.search(r"<w:rPr>(.*?)</w:rPr>", run_xml, re.DOTALL)
-        if rPr_match:
-            rPr = rPr_match.group(1)
-            color_match = re.search(r'<w:color [^>]*w:val="([A-Fa-f0-9]{6})"', rPr)
-            if color_match and color_match.group(1).lower() != "auto":
-                style = f"{color_match.group(1).upper()}"
-
-        run_text = ""
-        elements = re.finditer(
-            r"<w:t[^>]*>(.*?)</w:t>|<w:tab[^>]*/>|<w:br[^>]*/>", run_xml, re.DOTALL
-        )
-        for match in elements:
-            tag = match.group(0)
-            if tag.startswith("<w:t"):
-                raw_t = html.unescape(match.group(1))
-                # Escape thẻ <r> gốc của tài liệu nếu có
-                raw_t = raw_t.replace("<r:", "< r:").replace("</r>", "< /r>")
-                run_text += raw_t
-            elif tag.startswith("<w:tab"):
-                run_text += "\t"
-            elif tag.startswith("<w:br"):
-                run_text += " "
-
-        if run_text:
-            parsed_runs.append((style, run_text))
-
-    # Gộp các run cùng style
-    merged_runs = []
-    current_style = "INITIAL_STATE_NOT_MATCHING_ANYTHING"
-    current_text = ""
-
-    for style, text in parsed_runs:
-        if style == current_style:
-            current_text += text
-        else:
-            if current_text:
-                merged_runs.append((current_style, current_text))
-            current_style = style
-            current_text = text
-
-    if current_text:
-        merged_runs.append((current_style, current_text))
-
-    # Ráp chuỗi cuối cùng
-    text_parts = []
-    for style, text in merged_runs:
-        if style:
-            text_parts.append(f"<r:{style}>{text}</r>")
-        else:
-            text_parts.append(text)
-
-    return "".join(text_parts).strip()
-
-
 def _extract_comments(doc):
+    """Trả về danh sách comment gốc: [{"id", "text", "start", "end"}, ...],
+    id đánh số 1..N theo thứ tự xuất hiện trong document (không dùng
+    Comment.Index trực tiếp để tránh phụ thuộc thứ tự nội bộ của Word)."""
     comments = []
     for idx, cmt in enumerate(doc.Comments, start=1):
         try:
@@ -136,6 +66,9 @@ def _extract_comments(doc):
 
 
 def _comments_touching_range(comments, range_start, range_end):
+    """Trả về list comment có Scope giao với [range_start, range_end), kèm
+    is_start/is_end đánh dấu đoạn/ô này có phải là điểm bắt đầu/kết thúc của
+    scope comment đó hay không (dùng để quyết định chèn START marker)."""
     touching = []
     for c in comments:
         if c["start"] < range_end and c["end"] > range_start:
@@ -151,6 +84,8 @@ def _comments_touching_range(comments, range_start, range_end):
 
 
 def _apply_comment_markers(clean_text, touching):
+    """Chèn %%COMMENT_START:id%% / %%COMMENT:id%%<text> vào nội dung đã clean
+    của một paragraph/cell, theo danh sách comment liên quan tới nó."""
     if not touching:
         return clean_text
 
@@ -158,9 +93,14 @@ def _apply_comment_markers(clean_text, touching):
     suffix = ""
     for c in touching:
         if not c["is_start"]:
+            # Comment đã bắt đầu từ paragraph/cell trước đó — không lặp lại
+            # marker mở ở đây.
             pass
         elif not c["is_end"]:
+            # Bắt đầu tại đây nhưng còn tiếp tục ở paragraph/cell sau.
             prefix += COMMENT_START_TPL.format(id=c["id"])
+        # Nếu is_start và is_end đều True: comment gọn trong đúng đơn vị này,
+        # không cần marker mở, chỉ cần marker đóng bên dưới.
 
         if c["is_end"]:
             suffix += COMMENT_END_TPL.format(id=c["id"]) + c["text"]
@@ -172,6 +112,8 @@ def _apply_comment_markers(clean_text, touching):
 # MODE: --read — render bảng Markdown
 # ===========================================================
 def render_word_table_markdown(t_idx, table_data, styled_cells):
+    """styled_cells: dict {(row, col): text_da_qua_comment_marker} — text đã
+    escape | \\r \\n từ trước, không xử lý lại ở đây."""
     rows = table_data["rows"]
     cols = table_data["cols"]
 
@@ -218,73 +160,50 @@ def cmd_read(file_path, output_json_path):
 
         result = {
             "file": file_path,
+            # paragraphs: mảng chuỗi thuần, index = vị trí trong mảng = paragraph_index dùng cho --apply
             "paragraphs": [],
+            # tables: mỗi table gồm kích thước + mảng cell nén [row, col, text].
+            # Cell bị merge/unreadable KHÔNG xuất hiện trong "cells", mà liệt kê
+            # riêng trong "unreadable_cells" ([row, col]) — không lặp flag false
+            # cho từng cell bình thường.
             "tables": [],
         }
-
+        # Bản MD dùng text đã chèn %%COMMENT marker — xây song song với
+        # result (plain text, dùng cho JSON) để không phải mở lại Range COM
+        # lần 2. KHÔNG ghi comment vào result/JSON.
         md_paragraphs = []
-        md_table_cells = []
+        md_table_cells = (
+            []
+        )  # list song song với result["tables"], mỗi phần tử là dict {(r,c): styled_text}
 
-        # ---- Paragraphs ----
-        for i, para in enumerate(doc.Paragraphs):
-            text = ""
-            styled_text = ""
-
+        # ---- Paragraphs (1-based COM -> vị trí mảng 0-based = paragraph_index) ----
+        para_count = doc.Paragraphs.Count
+        for i in range(1, para_count + 1):
             try:
-                para_range = para.Range
+                para_range = doc.Paragraphs(i).Range
+                text = _clean_raw_text(para_range.Text).strip()
 
-                raw_text = ""
-                try:
-                    raw_text = para_range.Text
-                except Exception:
-                    pass
-                text = _clean_raw_text(raw_text).strip()
-
-                xml_string = None
-                try:
-                    xml_string = para_range.WordOpenXML
-                except Exception:
-                    pass
-
-                styled_text = None
-                if xml_string:
-                    try:
-                        styled_text = _get_styled_text_from_xml(xml_string)
-                    except Exception:
-                        pass
-
-                if styled_text is None:
-                    styled_text = text
-                    if styled_text:
-                        styled_text = styled_text.replace("<r:", "< r:").replace(
-                            "</r>", "< /r>"
-                        )
-
-                styled_text = _escape_comment_marks(styled_text)
-
-                try:
-                    touching = _comments_touching_range(
-                        comments, para_range.Start, para_range.End
-                    )
-                    styled_text = _apply_comment_markers(styled_text, touching)
-                except Exception:
-                    pass
-
+                styled_text = _escape_comment_marks(text)
+                touching = _comments_touching_range(
+                    comments, para_range.Start, para_range.End
+                )
+                styled_text = _apply_comment_markers(styled_text, touching)
             except Exception as e:
                 text = f"[ERROR đọc paragraph {i}: {e}]"
                 styled_text = text
-
             result["paragraphs"].append(text)
             md_paragraphs.append(styled_text)
 
-        # ---- Tables ----
-        for t_idx, table in enumerate(doc.Tables):
+        # ---- Tables (1-based COM -> index 0-based = table_index) ----
+        table_count = doc.Tables.Count
+        for t in range(1, table_count + 1):
+            table = doc.Tables(t)
             try:
                 n_rows = table.Rows.Count
                 n_cols = table.Columns.Count
             except Exception as e:
                 result["tables"].append(
-                    {"error": f"Không đọc được kích thước bảng {t_idx}: {e}"}
+                    {"error": f"Không đọc được kích thước bảng {t-1}: {e}"}
                 )
                 md_table_cells.append({})
                 continue
@@ -298,48 +217,19 @@ def cmd_read(file_path, output_json_path):
                     try:
                         cell = table.Cell(r, c)
                         cell_range = cell.Range
-
-                        raw_text = ""
-                        try:
-                            raw_text = cell_range.Text
-                        except Exception:
-                            pass
-                        cell_text = _clean_raw_text(raw_text).strip()
+                        cell_text = _clean_raw_text(cell_range.Text).strip()
                         cells.append([r - 1, c - 1, cell_text])
 
-                        xml_string = None
-                        try:
-                            xml_string = cell_range.WordOpenXML
-                        except Exception:
-                            pass
-
-                        styled_text = None
-                        if xml_string:
-                            try:
-                                styled_text = _get_styled_text_from_xml(xml_string)
-                            except Exception:
-                                pass
-
-                        if styled_text is None:
-                            styled_text = cell_text
-                            if styled_text:
-                                styled_text = styled_text.replace(
-                                    "<r:", "< r:"
-                                ).replace("</r>", "< /r>")
-
-                        styled_text = styled_text.replace("|", "\\|")
+                        styled_text = cell_text.replace("|", "\\|")
                         styled_text = _escape_comment_marks(styled_text)
-
-                        try:
-                            touching = _comments_touching_range(
-                                comments, cell_range.Start, cell_range.End
-                            )
-                            styled_text = _apply_comment_markers(styled_text, touching)
-                        except Exception:
-                            pass
-
+                        touching = _comments_touching_range(
+                            comments, cell_range.Start, cell_range.End
+                        )
+                        styled_text = _apply_comment_markers(styled_text, touching)
                         styled_cells[(r - 1, c - 1)] = styled_text
                     except Exception:
+                        # Cell(r,c) ném lỗi -> tọa độ này rơi vào vùng merge
+                        # hoặc không tồn tại độc lập.
                         unreadable.append([r - 1, c - 1])
 
             table_entry = {"rows": n_rows, "cols": n_cols, "cells": cells}
@@ -348,74 +238,49 @@ def cmd_read(file_path, output_json_path):
             result["tables"].append(table_entry)
             md_table_cells.append(styled_cells)
 
-        # Xử lý phần mở rộng & Lưu file
+        # Xử lý phần mở rộng
         base_path, _ = os.path.splitext(output_json_path)
         json_path = base_path + ".json"
         md_path = base_path + ".md"
-        md_compact_path = base_path + ".compact.md"
 
         out_dir = os.path.dirname(json_path)
         if out_dir:
             os.makedirs(out_dir, exist_ok=True)
 
-        # 1. Ghi JSON
+        # 1. Ghi file JSON — KHÔNG chứa comment, chỉ dành cho script mapping.
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(result, f, ensure_ascii=False, separators=(",", ":"))
         print(f"[SUCCESS] Saved Word structure JSON to: {json_path}")
 
-        def build_tables_md():
-            lines = ["# TABLES\n"]
-            for i, table_data in enumerate(result["tables"]):
-                if "error" in table_data:
-                    lines.append(
-                        f"## Table {i}\nError reading table: {table_data['error']}\n"
-                    )
-                    continue
-                lines.append(
-                    render_word_table_markdown(i, table_data, md_table_cells[i])
-                )
-            return lines
-
-        comments_footer = (
-            f"\n<!-- {len(comments)} comment(s) found — xem quy ước %%COMMENT trong SKILL.md -->"
-            if comments
-            else ""
-        )
-
-        # 2. Ghi FULL MD (Không loại bỏ dòng rỗng - map 1:1 với JSON)
+        # 2. Ghi file MD — có chèn comment marker, dành cho Agent đọc.
         md_lines = []
-        md_lines.append(
-            f"# WORD STRUCTURE DUMP (FULL): {os.path.basename(file_path)}\n"
-        )
+        md_lines.append(f"# WORD STRUCTURE DUMP: {os.path.basename(file_path)}\n")
+
         md_lines.append("# PARAGRAPHS\n")
         for styled_text in md_paragraphs:
             md_lines.append(styled_text)
         md_lines.append("\n")
-        md_lines.extend(build_tables_md())
-        if comments_footer:
-            md_lines.append(comments_footer)
 
+        md_lines.append("# TABLES\n")
+        for i, table_data in enumerate(result["tables"]):
+            if "error" in table_data:
+                md_lines.append(
+                    f"## Table {i}\nError reading table: {table_data['error']}\n"
+                )
+                continue
+            md_lines.append(
+                render_word_table_markdown(i, table_data, md_table_cells[i])
+            )
+
+        if comments:
+            md_lines.append(
+                f"\n<!-- {len(comments)} comment(s) found — xem quy ước %%COMMENT trong SKILL.md -->"
+            )
+
+        md_content = "\n".join(md_lines)
         with open(md_path, "w", encoding="utf-8") as f:
-            f.write("\n".join(md_lines))
-        print(f"[SUCCESS] Saved Word structure MD (Full) to: {md_path}")
-
-        # 3. Ghi COMPACT MD (Loại bỏ dòng rỗng để tiết kiệm LLM tokens)
-        compact_lines = []
-        compact_lines.append(
-            f"# WORD STRUCTURE DUMP (COMPACT): {os.path.basename(file_path)}\n"
-        )
-        compact_lines.append("# PARAGRAPHS\n")
-        for styled_text in md_paragraphs:
-            if styled_text.strip():
-                compact_lines.append(styled_text)
-        compact_lines.append("\n")
-        compact_lines.extend(build_tables_md())
-        if comments_footer:
-            compact_lines.append(comments_footer)
-
-        with open(md_compact_path, "w", encoding="utf-8") as f:
-            f.write("\n".join(compact_lines))
-        print(f"[SUCCESS] Saved Word structure MD (Compact) to: {md_compact_path}")
+            f.write(md_content)
+        print(f"[SUCCESS] Saved Word structure MD to: {md_path}")
 
     finally:
         if doc is not None:
@@ -457,7 +322,7 @@ def cmd_apply(changes_file):
         word = win32com.client.Dispatch("Word.Application")
         word.Visible = show_ui
         if show_ui:
-            word.WindowState = 1
+            word.WindowState = 1  # wdWindowStateNormal
 
         print(f"[INFO] Mở file: {target_file}")
         doc = word.Documents.Open(target_file)
@@ -477,6 +342,9 @@ def cmd_apply(changes_file):
 
             target_range = None
 
+            # --------------------------------------------------
+            # Scope: table_cell — chính xác nhất cho nội dung dạng bảng
+            # --------------------------------------------------
             if scope == "table_cell":
                 t_idx = rule.get("table_index", 0) + 1
                 r_idx = rule.get("row_index", 0) + 1
@@ -489,7 +357,7 @@ def cmd_apply(changes_file):
                         added_rows += 1
                     if added_rows > 0:
                         print(
-                            f"  [INFO] Table[{t_idx-1}]: Đã chèn thêm {added_rows} hàng mới"
+                            f"  [INFO] Table[{t_idx-1}]: Đã chèn thêm {added_rows} hàng mới (Tổng số hàng hiện tại: {table.Rows.Count})"
                         )
                     target_range = table.Cell(r_idx, c_idx).Range
                 except Exception as e:
@@ -498,6 +366,9 @@ def cmd_apply(changes_file):
                     )
                     continue
 
+            # --------------------------------------------------
+            # Scope: paragraph — anchor ưu tiên, fallback paragraph_index
+            # --------------------------------------------------
             elif scope == "paragraph":
                 anchor = rule.get("anchor")
                 p_idx = rule.get("paragraph_index")
@@ -505,11 +376,7 @@ def cmd_apply(changes_file):
                 if anchor:
                     found_para = None
                     for para in doc.Paragraphs:
-                        try:
-                            para_text = para.Range.Text
-                        except Exception:
-                            continue
-
+                        para_text = para.Range.Text
                         if anchor in para_text and (
                             not find_text or find_text in para_text
                         ):
@@ -530,22 +397,20 @@ def cmd_apply(changes_file):
                             f"  [ERROR] Rule {i}: paragraph_index={p_idx} không hợp lệ: {e}"
                         )
                         continue
-
-                    try:
-                        t_text = target_range.Text
-                    except Exception:
-                        t_text = ""
-
-                    if find_text and find_text not in t_text:
+                    # find_text vẫn phải khớp trong đoạn này nếu find_text không rỗng
+                    if find_text and find_text not in target_range.Text:
                         print(
-                            f"  [MISS] Rule {i}: paragraph_index={p_idx} không chứa find_text='{find_text[:50]}'"
+                            f"  [MISS] Rule {i}: paragraph_index={p_idx} không chứa find_text='{find_text[:50]}' "
+                            f"— khả năng file đã bị thay đổi kể từ lúc --read."
                         )
                         continue
+
                 else:
                     print(
                         f"  [ERROR] Rule {i}: Scope 'paragraph' cần 'anchor' hoặc 'paragraph_index'."
                     )
                     continue
+
             else:
                 print(
                     f"  [ERROR] Rule {i}: Scope không hợp lệ '{scope}'. Dùng 'paragraph' hoặc 'table_cell'."
@@ -613,7 +478,7 @@ def _replace_in_range(
 ):
     if len(replace_text) > WORD_REPLACE_MAX_LEN:
         print(
-            f"    [INFO] replace_text dài ({len(replace_text)} ký tự) — dùng Range trực tiếp."
+            f"    [INFO] replace_text dài ({len(replace_text)} ký tự) — dùng Range trực tiếp, không bị giới hạn 255 ký tự."
         )
 
     search_range = word_range.Duplicate
@@ -621,7 +486,7 @@ def _replace_in_range(
     find_obj.ClearFormatting()
     find_obj.Text = find_text
     find_obj.Forward = True
-    find_obj.Wrap = 0
+    find_obj.Wrap = 0  # wdFindStop
     find_obj.MatchCase = True
     find_obj.MatchWholeWord = False
     find_obj.MatchWildcards = False
@@ -632,7 +497,7 @@ def _replace_in_range(
     while find_obj.Execute():
         search_range.Text = replace_text
         count += 1
-        search_range.Collapse(0)
+        search_range.Collapse(0)  # wdCollapseEnd = 0
         if not unlimited and count >= max_replacements:
             break
 
@@ -678,8 +543,4 @@ def main():
 
 
 if __name__ == "__main__":
-    import time
-
-    start = time.time()
     main()
-    print(f"Thời gian chạy: {(time.time() - start):.4f} giây")

@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "safe-docx": {
-      "command": "npx",
-      "args": ["-y", "@usejunior/safe-docx"]
-    }
-  }
-}
