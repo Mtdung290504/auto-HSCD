@@ -403,11 +403,23 @@ Script ánh xạ là script dùng một lần cho phiên làm việc hiện tạ
 
 # VIETNAMESE ENCODING
 
-Khi chạy Python hoặc các lệnh CLI,
+Mọi lệnh Python — kể cả lệnh `python -c "..."` — đều bắt buộc set biến môi trường UTF-8 trước khi chạy, không có ngoại lệ.
 
-phải sử dụng UTF-8 để tránh UnicodeEncodeError khi xử lý tiếng Việt.
+Trên PowerShell, luôn chạy trước:
+```powershell
+$env:PYTHONIOENCODING="utf-8"
+```
+trong cùng phiên lệnh trước khi gọi `python`.
 
-Hãy xem toàn bộ input, output, dữ liệu nhận được là UTF-8 và script phải luôn chỉ định xử lý UTF-8 thay vì để mặc định.
+Không được giả định terminal đã ở UTF-8. Không được bỏ qua bước này chỉ vì lệnh
+"ngắn" hoặc "chỉ để debug" — UnicodeEncodeError xảy ra bất kể độ dài script.
+
+Nếu agent viết script Python ra file (không phải lệnh `-c` một dòng), thêm dòng
+sau ngay đầu file, trước bất kỳ print() nào:
+```python
+import sys
+sys.stdout.reconfigure(encoding="utf-8")
+```
 
 ---
 
